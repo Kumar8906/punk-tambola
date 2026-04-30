@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Play Tambola</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #333; margin: 0; padding: 0; text-align: center; }
+        .header { background: #000080; color: white; padding: 15px; font-size: 1.5em; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .container { padding: 20px; max-width: 500px; margin: auto; }
+        
+        .login-box { background: white; padding: 30px 20px; border-radius: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); margin-top: 30px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 8px; font-size: 1.1em; outline: none; transition: 0.3s; }
+        input:focus { border-color: #000080; }
+        
+        .btn-play { background: #0000cd; color: white; padding: 15px; width: 95%; border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .btn-play:hover { background: #000080; }
+
+        /* Game Area */
+        .live-call { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .current-number { font-size: 5em; font-weight: 900; color: red; margin: 10px 0; }
+        
+        .ticket-wrapper { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); margin-top: 20px; }
+        .ticket-header { font-weight: bold; color: #000080; margin-bottom: 15px; font-size: 1.2em; border-bottom: 2px solid #eee; padding-bottom: 10px;}
+        
+        .ticket-row { display: flex; justify-content: center; }
+        .ticket-cell { width: 35px; height: 35px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 1.1em; font-weight: 600; margin: 1px; transition: 0.2s; user-select: none; }
+        
+        .empty-cell { background-color: #f9f9f9; border-color: transparent; }
+        
+        /* Interactive tapping */
+        .number-cell { cursor: pointer; background: #e6f2ff; color: #000080; border-color: #b3d9ff; }
+        .marked { background: red !important; color: white !important; border-color: darkred !important; transform: scale(0.95); border-radius: 6px; }
+
+        .announcement { margin-top: 20px; color: green; font-weight: bold; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+
+    <div class="header">ONLINE TAMBOLA</div>
+
+    <div class="container">
+        
+        <!-- LOGIN SCREEN -->
+        <div id="loginScreen" class="login-box">
+            <h2>Join the Game</h2>
+            <p style="color: #666; margin-bottom: 20px;">Enter your details to get your ticket.</p>
+            <input type="text" id="playerName" placeholder="Your Name" autocomplete="off">
+            <input type="number" id="ticketId" placeholder="Ticket Number (e.g., 5)">
+            <button class="btn-play" onclick="joinGame()">GET MY TICKET</button>
+        </div>
+
+        <!-- LIVE TICKET SCREEN -->
+        <div id="gameScreen" style="display: none;">
+            <div class="live-call">
+                <div style="color: #666; font-weight: bold; text-transform: uppercase;">Latest Call</div>
+                <div class="current-number" id="liveNumber">--</div>
+            </div>
+
+            <div class="ticket-wrapper">
+                <div class="ticket-header">
+                    Ticket #<span id="displayTktId"></span> <br>
+                    <span style="font-size: 0.8em; color: #666;">Playing as: <span id="displayPlayer"></span></span>
+                </div>
+                <div id="myTicketArea"></div>
+                <p style="color: #888; font-size: 0.9em; margin-top: 15px;">Tap the numbers to mark them as they are called!</p>
+            </div>
+
+            <div id="winnerBanner" class="announcement"></div>
+        </div>
+
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const roomId = "LIVE_ROOM"; // Matches the Admin Dashboard exactly
+
+        function joinGame() {
+            const name = document.getElementById('playerName').value;
+            const tkt = document.getElementById('ticketId').value;
+            if(!name || !tkt) return alert("Please enter both Name and Ticket Number!");
+            
+            socket.emit('playerJoin', roomId, name, tkt);
+        }
+
+        socket.on('playerTicketData', (data) => {
+            // Hide Login, Show Game
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('gameScreen').style.display = 'block';
+            
+            document.getElementById('displayTktId').innerText = data.ticketId;
+            document.getElementById('displayPlayer').innerText = data.playerName;
+
+            // Render the ticket
+            let html = '';
+            let numIndex = 0;
+            for (let r = 0; r < 3; r++) {
+                html += '<div class="ticket-row">';
+                for (let c = 0; c < 9; c++) {
+                    if (numIndex < 15 && Math.random() > 0.4) {
+                        let num = data.numbers[numIndex];
+                        // If player joins late, auto-mark drawn numbers!
+                        let isMarked = data.drawnNumbers.includes(num) ? 'marked' : '';
+                        html += `<div class="ticket-cell number-cell ${isMarked}" onclick="this.classList.toggle('marked')">${num}</div>`;
+                        numIndex++;
+                    } else {
+                        html += `<div class="ticket-cell empty-cell"></div>`;
+                    }
+                }
+                html += '</div>';
+            }
+            document.getElementById('myTicketArea').innerHTML = html;
+        });
+
+        // Listen for new numbers being drawn
+        socket.on('numberDrawn', (num) => {
+            document.getElementById('liveNumber').innerText = num;
+            // Vibrate phone slightly for excitement (if supported)
+            if(navigator.vibrate) navigator.vibrate(100); 
+        });
+
+        // Listen for Admin winner announcements
+        socket.on('winnerAnnounced', (data) => {
+            document.getElementById('winnerBanner').innerText = `🎉 ${data.name} just won ${data.pattern}!`;
+            setTimeout(() => { document.getElementById('winnerBanner').innerText = ''; }, 6000);
+        });
+
+        socket.on('errorMsg', (msg) => alert(msg));
+    </script>
+</body>
+</html>
