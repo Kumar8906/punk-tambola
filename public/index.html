@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tambola Admin Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+        
+        :root { --bg-color: #f0f2f5; --text-color: #1f2937; --primary: #2563eb; --accent: #dc2626; --ticket-bg: #ffffff; --marked: #16a34a; }
+        body { font-family: 'Poppins', sans-serif; text-align: center; margin: 0; padding: 20px; background-color: var(--bg-color); color: var(--text-color); transition: 0.3s; }
+        .container { max-width: 1200px; margin: auto; }
+        
+        h1 { font-size: 3em; font-weight: 800; text-transform: uppercase; margin-bottom: 20px; }
+        button { cursor: pointer; border: none; font-family: 'Poppins', sans-serif; transition: all 0.2s ease; }
+        
+        /* --- ADMIN DASHBOARD (Matches Screenshot 3) --- */
+        .admin-dashboard {
+            background: linear-gradient(135deg, #7df64c 0%, #51d024 100%);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            max-width: 800px;
+            margin: 0 auto 40px auto;
+            color: #000;
+        }
+        
+        .admin-group { margin-bottom: 15px; }
+        .admin-label { display: block; font-weight: 800; margin-bottom: 5px; font-size: 1.1em; }
+        .admin-input { 
+            width: 100%; max-width: 400px; padding: 12px; 
+            border-radius: 8px; border: none; 
+            text-align: center; font-size: 1.1em; font-weight: 600; 
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .prize-header {
+            background-color: #ffb6c1; /* Pink header */
+            padding: 12px;
+            font-weight: 800;
+            font-size: 1.2em;
+            border-radius: 8px;
+            margin: 30px 0 20px 0;
+            text-transform: uppercase;
+        }
+        
+        .prize-row { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 12px; }
+        .prize-row span { font-weight: 800; width: 120px; text-align: right; }
+        .prize-input { padding: 10px; border-radius: 8px; border: none; width: 150px; text-align: right; font-weight: 600; }
+        
+        .btn-save {
+            background-color: #ff3333; /* Red Button */
+            color: white;
+            padding: 12px 30px;
+            font-size: 1.2em;
+            font-weight: 800;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .btn-save:hover { background-color: #cc0000; transform: translateY(-2px); }
+
+        /* --- GAME UI --- */
+        .panel { background-color: var(--ticket-bg); padding: 30px; margin: 15px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        .game-grid { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 25px; align-items: start; }
+        @media(max-width: 900px) { .game-grid { grid-template-columns: 1fr; } }
+        
+        .number-display { font-size: 7em; font-weight: 800; color: var(--accent); margin: 20px 0; }
+        .std-btn { background-color: var(--primary); color: white; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 1em;}
+        
+        .ticket-wrapper { margin-bottom: 25px; background: var(--ticket-bg); padding: 15px; border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.08); display: inline-block;}
+        .ticket-row { display: flex; justify-content: center; }
+        .ticket-cell { width: 45px; height: 45px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 1.3em; font-weight: 600; cursor: pointer; user-select: none; }
+        .empty-cell { background-color: #f5f5f5; cursor: default; }
+        .marked { background-color: var(--marked) !important; color: white; transform: scale(0.95); border-radius: 8px;}
+        
+        /* Modal simple join */
+        .join-bar { background: white; padding: 20px; border-radius: 10px; margin-bottom: 30px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.1);}
+        .join-bar input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="mainTitle">Tambola Lite Admin</h1>
+
+        <div id="joinArea" class="join-bar">
+            <strong>Player Join:</strong>
+            <input type="text" id="joinRoomId" placeholder="Room Code (e.g. 445)">
+            <input type="text" id="playerName" placeholder="Player Name">
+            <button class="std-btn" onclick="requestTickets()">Browse Tickets</button>
+        </div>
+
+        <div id="setupArea" class="admin-dashboard">
+            <div class="admin-group" style="display: flex; gap: 10px; justify-content: center;">
+                <div>
+                    <label class="admin-label">Room Code</label>
+                    <input type="text" class="admin-input" id="createRoomId" value="445" style="width: 100px;">
+                </div>
+                <div>
+                    <label class="admin-label">Host Password</label>
+                    <input type="password" class="admin-input" id="adminPassword" placeholder="****" style="width: 100px;">
+                </div>
+            </div>
+
+            <div class="admin-group">
+                <label class="admin-label">Date</label>
+                <input type="datetime-local" class="admin-input" id="gameDate">
+            </div>
+
+            <div class="admin-group">
+                <label class="admin-label">Total Ticket (unlimited)</label>
+                <input type="number" class="admin-input" id="poolSize" value="600">
+            </div>
+
+            <div class="admin-group">
+                <label class="admin-label">Ticket Price</label>
+                <input type="number" class="admin-input" id="ticketPrice" value="200">
+            </div>
+
+            <div class="admin-group">
+                <label class="admin-label">Booking Status</label>
+                <select class="admin-input" id="bookingStatus">
+                    <option value="OPEN">OPEN</option>
+                    <option value="CLOSED">CLOSED</option>
+                </select>
+            </div>
+
+            <div class="prize-header">Prize Settings</div>
+            
+            <div class="prize-row">
+                <span>1st Prize</span>
+                <input type="number" class="prize-input" id="prize1" value="60000">
+                <input type="checkbox" id="chk-prize1" checked>
+            </div>
+            <div class="prize-row">
+                <span>2nd Prize</span>
+                <input type="number" class="prize-input" id="prize2" value="50000">
+                <input type="checkbox" id="chk-prize2" checked>
+            </div>
+            <div class="prize-row">
+                <span>Full House</span>
+                <input type="number" class="prize-input" id="prizeFH" value="10000">
+                <input type="checkbox" id="chk-fh" checked>
+            </div>
+            <div class="prize-row">
+                <span>Top Line</span>
+                <input type="number" class="prize-input" id="prizeTop" value="5000">
+                <input type="checkbox" id="chk-top" checked>
+            </div>
+
+            <button class="btn-save" onclick="hostGame()">Save game</button>
+        </div>
+
+        <div id="ticketSelectionArea" class="panel" style="display:none;">
+            <h2>Select Your Tickets</h2>
+            <p>Ticket Price: ₹<span id="displayPrice"></span></p>
+            <div id="poolContainer" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-height: 500px; overflow-y: auto; padding: 20px; background: #eee; border-radius: 12px;"></div>
+            <button class="std-btn" onclick="confirmTicketSelection()" style="background-color: #16a34a; font-size: 1.2em; margin-top: 20px; width: 100%;">Book Now</button>
+        </div>
+
+        <div id="gameArea" style="display:none;">
+            <div class="game-grid">
+                <div class="panel">
+                    <h3>Prize Board</h3>
+                    <div id="claimsList" style="text-align: left; font-size: 1.1em;"></div>
+                </div>
+                <div class="panel">
+                    <h2>Current Call</h2>
+                    <div class="number-display" id="currentNumber">--</div>
+                    <div id="myTicketArea" style="display: none;">
+                        <h3>My Tickets</h3>
+                        <div id="activeTicketsContainer"></div>
+                    </div>
+                    <div style="margin-top: 20px;"><h4>Called Numbers</h4><p id="history"></p></div>
+                </div>
+                <div class="panel">
+                    <h3 id="roomDisplay"></h3>
+                    <div id="hostControls" style="display:none;">
+                        <button class="std-btn" onclick="draw()" style="width: 100%; margin-bottom: 10px;">Draw Number</button>
+                        <select id="themeSelect" onchange="updateTheme()" style="width: 100%; margin-bottom: 10px;">
+                            <option value="modern">Modern Light</option>
+                            <option value="prada">PRADA Gold</option>
+                            <option value="bihu">Bihu Festival</option>
+                        </select>
+                    </div>
+                    <h4>Game Log</h4>
+                    <div id="gameLog" style="font-size: 0.9em; text-align: left; background: #eee; padding: 10px; border-radius: 5px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentRoom = '';
+        let isHost = false;
+        let selectedTicketIds = [];
+        let storedPlayerName = '';
+
+        function renderTicketHTML(numbers) {
+            let html = '';
+            let numIndex = 0;
+            for (let r = 0; r < 3; r++) {
+                html += '<div class="ticket-row">';
+                for (let c = 0; c < 9; c++) {
+                    if (numIndex < 15 && Math.random() > 0.4) {
+                        html += `<div class="ticket-cell" onclick="markNumber(this)">${numbers[numIndex]}</div>`;
+                        numIndex++;
+                    } else {
+                        html += `<div class="ticket-cell empty-cell"></div>`;
+                    }
+                }
+                html += '</div>';
+            }
+            return html;
+        }
+
+        function markNumber(element) { if(!element.classList.contains('empty-cell')) element.classList.toggle('marked'); }
+
+        // Upgraded Host Function
+        function hostGame() {
+            currentRoom = document.getElementById('createRoomId').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            // Collect all the new business settings from the green dashboard
+            const businessConfig = {
+                gameDate: document.getElementById('gameDate').value,
+                ticketCount: parseInt(document.getElementById('poolSize').value) || 600,
+                ticketPrice: parseInt(document.getElementById('ticketPrice').value) || 200,
+                status: document.getElementById('bookingStatus').value,
+                patterns: {}
+            };
+
+            // Only add checked prizes
+            if(document.getElementById('chk-prize1').checked) businessConfig.patterns['1st Prize (₹' + document.getElementById('prize1').value + ')'] = true;
+            if(document.getElementById('chk-prize2').checked) businessConfig.patterns['2nd Prize (₹' + document.getElementById('prize2').value + ')'] = true;
+            if(document.getElementById('chk-fh').checked) businessConfig.patterns['Full House (₹' + document.getElementById('prizeFH').value + ')'] = true;
+            if(document.getElementById('chk-top').checked) businessConfig.patterns['Top Line (₹' + document.getElementById('prizeTop').value + ')'] = true;
+
+            socket.emit('createRoom', currentRoom, password, businessConfig);
+        }
+
+        socket.on('roomCreatedSuccess', (config) => {
+            isHost = true;
+            document.getElementById('setupArea').style.display = 'none';
+            document.getElementById('joinArea').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+            document.getElementById('hostControls').style.display = 'block';
+            document.getElementById('roomDisplay').innerText = "Hosting Room: " + currentRoom;
+            
+            let log = document.getElementById('gameLog');
+            log.innerHTML += `<div>Game Saved! Total Tickets: ${config.ticketCount} @ ₹${config.ticketPrice}</div>`;
+        });
+
+        // Player Flow
+        function requestTickets() {
+            currentRoom = document.getElementById('joinRoomId').value;
+            storedPlayerName = document.getElementById('playerName').value;
+            if(!storedPlayerName) return alert("Enter your name!");
+            socket.emit('requestTickets', currentRoom, storedPlayerName);
+        }
+
+        socket.on('showTicketPool', (availableTickets, playerName, ticketPrice) => {
+            document.getElementById('setupArea').style.display = 'none';
+            document.getElementById('joinArea').style.display = 'none';
+            document.getElementById('ticketSelectionArea').style.display = 'block';
+            document.getElementById('displayPrice').innerText = ticketPrice; // Show the price you set!
+            
+            let container = document.getElementById('poolContainer');
+            container.innerHTML = '';
+            
+            availableTickets.forEach(ticket => {
+                let div = document.createElement('div');
+                div.className = 'ticket-wrapper';
+                div.style.cursor = 'pointer';
+                div.innerHTML = `<div class="ticket-title">Ticket #${ticket.id}</div>` + renderTicketHTML(ticket.numbers);
+                
+                div.onclick = () => {
+                    div.style.border = selectedTicketIds.includes(ticket.id) ? "none" : "3px solid #2563eb";
+                    if(selectedTicketIds.includes(ticket.id)) {
+                        selectedTicketIds = selectedTicketIds.filter(id => id !== ticket.id);
+                    } else {
+                        selectedTicketIds.push(ticket.id);
+                    }
+                };
+                container.appendChild(div);
+            });
+        });
+
+        function confirmTicketSelection() {
+            if(selectedTicketIds.length === 0) return alert("Select a ticket.");
+            socket.emit('claimTickets', currentRoom, storedPlayerName, selectedTicketIds);
+        }
+
+        socket.on('ticketsConfirmed', (confirmedTickets, gameState) => {
+            document.getElementById('ticketSelectionArea').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+            
+            document.getElementById('myTicketArea').style.display = 'block';
+            let activeContainer = document.getElementById('activeTicketsContainer');
+            confirmedTickets.forEach(ticket => {
+                activeContainer.innerHTML += `<div class="ticket-wrapper"><div class="ticket-title">Ticket #${ticket.id}</div>${renderTicketHTML(ticket.numbers)}</div>`;
+            });
+
+            let claimsHtml = '';
+            for (const [pattern, isActive] of Object.entries(gameState.patterns)) {
+                if (isActive) {
+                    claimsHtml += `<div style="margin-bottom: 10px;"><strong>${pattern}</strong><br><button class="std-btn" onclick="makeClaim('${pattern}')">Claim</button></div>`;
+                }
+            }
+            document.getElementById('claimsList').innerHTML = claimsHtml;
+        });
+
+        // Game Actions
+        function draw() { socket.emit('drawNumber', currentRoom); }
+        socket.on('numberDrawn', (number) => {
+            document.getElementById('currentNumber').innerText = number;
+            document.getElementById('history').innerText += number + " • ";
+        });
+
+        function makeClaim(pattern) { socket.emit('claimPattern', currentRoom, pattern); }
+        socket.on('winnerAnnounced', (data) => {
+            let log = document.getElementById('gameLog');
+            log.innerHTML += `<div style="color:green; font-weight:bold;">${data.name} claimed ${data.pattern}!</div>`;
+        });
+
+        socket.on('errorMsg', (msg) => { alert(msg); });
+        socket.on('sysMessage', (msg) => {
+            document.getElementById('gameLog').innerHTML += `<div>${msg}</div>`;
+        });
+
+    </script>
+</body>
+</html>
