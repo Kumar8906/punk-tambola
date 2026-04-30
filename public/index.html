@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Play Tambola!</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; margin: 0; padding: 10px; }
+        .panel { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .btn { background: #2563eb; color: white; padding: 12px 20px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase;}
+        .call-box { font-size: 60px; color: red; font-weight: bold; padding: 10px 30px; border: 2px solid red; display: inline-block; border-radius: 10px; margin: 10px; }
+        
+        .ticket-wrapper { margin: 15px auto; background: white; padding: 10px; border-radius: 8px; border: 2px solid #2563eb; max-width: 400px;}
+        .ticket-row { display: flex; justify-content: center; }
+        .ticket-cell { width: 35px; height: 35px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; user-select: none; }
+        .empty-cell { background: #eee; border-color: transparent; cursor: default;}
+        .marked { background: #16a34a !important; color: white; border-color: #16a34a;}
+
+        .grid-1-90 { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; max-width: 500px; margin: auto; }
+        .num-dot { border: 1px solid #000080; background: white; color: #000080; padding: 5px 0; font-size: 12px; font-weight: bold; }
+        .called { background: #000080 !important; color: white; }
+    </style>
+</head>
+<body>
+    <h2 style="color: #000080;">PUNK TAMBOLA</h2>
+
+    <div id="joinArea" class="panel">
+        <h3>Join the Game</h3>
+        <input type="text" id="playerName" placeholder="Enter Your Name" style="width: 90%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px;">
+        <button class="btn" onclick="joinGame()">GET TICKETS</button>
+    </div>
+
+    <div id="gameArea" style="display: none;">
+        <div class="panel">
+            <h3>CURRENT CALL</h3>
+            <div class="call-box" id="currentCall">--</div>
+        </div>
+
+        <div style="margin: 20px auto; max-width: 400px; background: white; padding: 15px; border-radius: 10px; border: 2px solid #000080; text-align: center;">
+            <h3 style="color: #000080; margin-top: 0;">CLAIM A DIVIDEND</h3>
+            <select id="claimPattern" style="width: 100%; padding: 10px; margin-bottom: 10px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px;">
+                <option value="Early 5">Early 5</option>
+                <option value="Top Line">Top Line</option>
+                <option value="Middle Line">Middle Line</option>
+                <option value="Bottom Line">Bottom Line</option>
+                <option value="1st Full House">1st Full House</option>
+            </select>
+            <button onclick="sendClaim()" style="width: 100%; padding: 12px; background: red; color: white; font-weight: bold; border: none; border-radius: 5px; cursor: pointer;">SEND CLAIM TO ADMIN</button>
+        </div>
+
+        <div class="panel" id="myTickets">
+            <h3>MY TICKETS</h3>
+            <div id="ticketContainer"></div>
+        </div>
+
+        <div class="panel">
+            <h3>NUMBERS CALLED</h3>
+            <div class="grid-1-90" id="board"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const roomId = "LIVE_ROOM"; 
+        let myName = "";
+
+        const board = document.getElementById('board');
+        for(let i=1; i<=90; i++) { board.innerHTML += `<div class="num-dot" id="dot-${i}">${i}</div>`; }
+
+        function joinGame() {
+            myName = document.getElementById('playerName').value;
+            if(!myName) return alert("Enter your name!");
+            socket.emit('requestTickets', roomId, myName);
+        }
+
+        socket.on('showTicketPool', (availableTickets) => {
+            if(availableTickets.length > 0) {
+                socket.emit('claimTickets', roomId, myName, [availableTickets[0].id]);
+            } else {
+                alert("No tickets left!");
+            }
+        });
+
+        socket.on('ticketsConfirmed', (confirmedTickets, gameState) => {
+            document.getElementById('joinArea').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+
+            let tContainer = document.getElementById('ticketContainer');
+            confirmedTickets.forEach(t => {
+                let html = `<div class="ticket-wrapper"><b>Ticket #${t.id}</b>`;
+                let numIndex = 0;
+                for (let r = 0; r < 3; r++) {
+                    html += '<div class="ticket-row">';
+                    for (let c = 0; c < 9; c++) {
+                        if (numIndex < 15 && Math.random() > 0.4) {
+                            html += `<div class="ticket-cell" onclick="this.classList.toggle('marked')">${t.numbers[numIndex]}</div>`;
+                            numIndex++;
+                        } else {
+                            html += `<div class="ticket-cell empty-cell"></div>`;
+                        }
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+                tContainer.innerHTML += html;
+            });
+
+            // Sync past drawn numbers
+            gameState.drawn.forEach(num => {
+                document.getElementById(`dot-${num}`).classList.add('called');
+            });
+            if(gameState.drawn.length > 0) {
+                document.getElementById('currentCall').innerText = gameState.drawn[gameState.drawn.length - 1];
+            }
+        });
+
+        socket.on('numberDrawn', (num) => {
+            document.getElementById('currentCall').innerText = num;
+            document.getElementById(`dot-${num}`).classList.add('called');
+        });
+
+        function sendClaim() {
+            const pattern = document.getElementById('claimPattern').value;
+            if(myName !== '') {
+                socket.emit('playerClaim', roomId, myName, pattern);
+                alert("Claim sent! Admin will verify and announce.");
+            } else {
+                alert("Error: You must join the game first.");
+            }
+        }
+        
+        socket.on('errorMsg', (m) => alert(m));
+    </script>
+</body>
+</html>
