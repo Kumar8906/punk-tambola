@@ -50,6 +50,14 @@ io.on('connection', (socket) => {
             io.to(roomId).emit('numberDrawn', number);
         }
     });
+    
+    socket.on('numberDrawn', (num) => {
+        document.getElementById('currentNum').innerText = num;
+        document.getElementById(`dot-${num}`).classList.add('called');
+        
+        const speech = new SpeechSynthesisUtterance("Number " + num);
+        window.speechSynthesis.speak(speech);
+    });
 
     socket.on('declareWinner', (roomId, pattern, winnerName) => {
         let room = gameRooms[roomId];
