@@ -258,6 +258,20 @@
     });
 
     socket.on('errorMsg', (m) => alert(m));
+    
+    // NEW: Admin hears the claim and auto-fills the board
+    socket.on('adminAlertClaim', (data) => {
+        const safeId = data.pattern.replace(/[^a-zA-Z0-9]/g, '');
+        const inputField = document.getElementById(`win-input-${safeId}`);
+        
+        // If the box is empty, auto-fill it and announce it out loud!
+        if(inputField && document.getElementById(`win-text-${safeId}`).innerText === "--") {
+            inputField.value = data.name; 
+            
+            const speech = new SpeechSynthesisUtterance(`Attention Admin! ${data.name} is claiming ${data.pattern}!`);
+            window.speechSynthesis.speak(speech);
+        }
+    });
 </script>
 </body>
 </html>
