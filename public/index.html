@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Play Tambola!</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; margin: 0; padding: 10px; }
+        .panel { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .btn { background: #2563eb; color: white; padding: 12px 20px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase;}
+        .call-box { font-size: 60px; color: red; font-weight: bold; padding: 10px 30px; border: 2px solid red; display: inline-block; border-radius: 10px; margin: 10px; }
+        
+        /* Tickets */
+        .ticket-wrapper { margin: 10px; background: white; padding: 10px; border-radius: 8px; border: 3px solid #ccc; max-width: 400px; display: inline-block; cursor: pointer; transition: 0.2s;}
+        .ticket-selected { border-color: #2563eb; background: #eef2ff; transform: scale(1.02); }
+        .ticket-row { display: flex; justify-content: center; }
+        .ticket-cell { width: 35px; height: 35px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .empty-cell { background: #eee; border-color: transparent;}
+        .marked { background: #16a34a !important; color: white; border-color: #16a34a;}
+
+        .grid-1-90 { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; max-width: 500px; margin: auto; }
+        .num-dot { border: 1px solid #000080; background: white; color: #000080; padding: 5px 0; font-size: 12px; font-weight: bold; }
+        .called { background: #000080 !important; color: white; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px;}
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #ff9900; color: black; }
+        .winner-name { color: red; font-weight: bold; text-transform: uppercase;}
+    </style>
+</head>
+<body>
+    <h2 style="color: #000080;">PUNK TAMBOLA</h2>
+
+    <div id="joinArea" class="panel">
+        <h3>Join the Game</h3>
+        <input type="text" id="playerName" placeholder="Enter Your Name" style="width: 90%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px;">
+        <button class="btn" onclick="startSelection()">BROWSE TICKETS</button>
+    </div>
+
+    <div id="selectionArea" class="panel" style="display: none;">
+        <h3 style="color: #2563eb;">SELECT YOUR TICKETS</h3>
+        <div id="poolContainer" style="max-height: 400px; overflow-y: auto; background: #f9fafb; padding: 10px; border-radius: 10px; margin-bottom: 15px;"></div>
+        <button class="btn" style="background: #16a34a;" onclick="confirmTickets()">ENTER GAME WITH SELECTED</button>
+    </div>
+
+    <div id="gameArea" style="display: none;">
+        <div class="panel">
+            <h3>CURRENT CALL</h3>
+            <div class="call-box" id="currentCall">--</div>
+        </div>
+
+        <div class="panel">
+            <h3 style="color: #ff9900;">🏆 LIVE WINNERS BOARD 🏆</h3>
+            <table id="playerWinnersTable"></table>
+        </div>
+
+        <div class="panel" id="myTickets">
+            <h3>MY TICKETS <small>(Auto-Marking)</small></h3>
+            <div id="ticketContainer"></div>
+        </div>
+
+        <div class="panel">
+            <h3>NUMBERS CALLED</h3>
+            <div class="grid-1-90" id="board"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const roomId = "LIVE_ROOM"; 
+        let myName = "";
+        let selectedIds = [];
+
+        const board = document.getElementById('board');
+        for(let i=1; i<=90; i++) { board.innerHTML += `<div class="num-dot" id="dot-${i}">${i}</div>`; }
+
+        // 1. Enter Name
+        function startSelection() {
+            myName = document.getElementById('playerName').value;
+            if(!myName) return alert("Enter your name!");
+            socket.emit('requestTickets', roomId, myName);
+        }
+
+        // 2. Pick Tickets
+        socket.on('showTicketPool', (availableTickets) => {
+            document.getElementById('joinArea').style.display = 'none';
+            document.getElementById('selectionArea').style.display = 'block';
+            
+            let pool = document.getElementById('poolContainer');
+            pool.innerHTML = '';
+            
+            availableTickets.forEach(t => {
+                let div = document.createElement('div');
+                div.className = 'ticket-wrapper';
+                div.innerHTML = `<b>Ticket #${t.id}</b>` + renderTicketHTML(t.numbers, false);
+                
+                div.onclick = () => {
+                    div.classList.toggle('ticket-selected');
+                    if(selectedIds.includes(t.id)) {
+                        selectedIds = selectedIds.filter(id => id !== t.id);
+                    } else {
+                        selectedIds.push(t.id);
+                    }
+                };
+                pool.appendChild(div);
+            });
+        });
+
+        // 3. Confirm Selection
+        function confirmTickets() {
+            if(selectedIds.length === 0) return alert("Please select at least one ticket.");
+            socket.emit('claimTickets', roomId, myName, selectedIds);
+        }
+
+        socket.on('ticketsConfirmed', (confirmedTickets, gameState) => {
+            document.getElementById('selectionArea').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+
+            // Setup Winners Board
+            let winTable = document.getElementById('playerWinnersTable');
+            winTable.innerHTML = '<tr><th>DIVIDEND</th><th>WINNER</th></tr>';
+            gameState.config.patterns.forEach(pattern => {
+                const safeId = pattern.replace(/[^a-zA-Z0-9]/g, '');
+                let currentWinner = gameState.winners[pattern] || "--";
+                winTable.innerHTML += `<tr><td><b>${pattern}</b></td><td id="p-win-${safeId}" class="winner-name">${currentWinner}</td></tr>`;
+            });
+
+            // Display Tickets
+            let tContainer = document.getElementById('ticketContainer');
+            confirmedTickets.forEach(t => {
+                tContainer.innerHTML += `<div class="ticket-wrapper" style="border-color:#2563eb;"><b>Ticket #${t.id}</b>${renderTicketHTML(t.numbers, true)}</div>`;
+            });
+
+            // Sync past history
+            gameState.drawn.forEach(num => {
+                document.getElementById(`dot-${num}`).classList.add('called');
+                let cell = document.getElementById(`mycell-${num}`);
+                if(cell) cell.classList.add('marked');
+            });
+            if(gameState.drawn.length > 0) document.getElementById('currentCall').innerText = gameState.drawn[gameState.drawn.length - 1];
+        });
+
+        function renderTicketHTML(numbers, isMyTicket) {
+            let html = ''; let numIndex = 0;
+            for (let r = 0; r < 3; r++) {
+                html += '<div class="ticket-row">';
+                for (let c = 0; c < 9; c++) {
+                    if (numIndex < 15 && Math.random() > 0.4) {
+                        let idStr = isMyTicket ? `id="mycell-${numbers[numIndex]}"` : "";
+                        html += `<div class="ticket-cell" ${idStr}>${numbers[numIndex]}</div>`;
+                        numIndex++;
+                    } else {
+                        html += `<div class="ticket-cell empty-cell"></div>`;
+                    }
+                }
+                html += '</div>';
+            }
+            return html;
+        }
+
+        // Live Auto-Marking
+        socket.on('numberDrawn', (num) => {
+            document.getElementById('currentCall').innerText = num;
+            document.getElementById(`dot-${num}`).classList.add('called');
+            
+            // Auto stamp the ticket green
+            let myCell = document.getElementById(`mycell-${num}`);
+            if(myCell) myCell.classList.add('marked');
+        });
+
+        // Live Winner Updates
+        socket.on('winnerAnnounced', (data) => {
+            const safeId = data.pattern.replace(/[^a-zA-Z0-9]/g, '');
+            document.getElementById(`p-win-${safeId}`).innerText = data.name;
+        });
+
+        socket.on('errorMsg', (m) => alert(m));
+    </script>
+</body>
+</html>
